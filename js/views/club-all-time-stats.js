@@ -1,8 +1,10 @@
+// js/views/club-all-time-stats.js  (UPDATED: full file)
 import { supabase } from '../supabase-client.js';
 import { viewContainer } from '../view-container.js';
 import { states } from '../components/states.js';
 import { injectStyle } from '../utils/inject-style.js';
 import { aboutHeader, clubRecordsSubNav } from './club-shared.js';
+import { hasAccess, renderSectionGate } from '../utils/account-gate.js';
 
 injectStyle('club-all-time-stats-view', `
   .stats-grid {
@@ -68,6 +70,26 @@ export async function clubAllTimeStatsView() {
   const root = document.querySelector('#app');
   const slot = root.querySelector('[data-slot="content"]');
 
+  // The page header and sub-nav stay public; only the stats need an account.
+  if (!(await hasAccess())) {
+    renderSectionGate(slot, 'Log in or create an account to view player records.');
+
+    const onAuth = async () => {
+      document.removeEventListener('auth:changed', onAuth);
+      if (!slot.isConnected) return;
+      slot.innerHTML = '<div class="skel skel-block" style="height:200px;"></div>';
+      await loadStats(slot);
+    };
+    document.addEventListener('auth:changed', onAuth);
+
+    return { cleanup: () => document.removeEventListener('auth:changed', onAuth) };
+  }
+
+  await loadStats(slot);
+  return { cleanup: null };
+}
+
+async function loadStats(slot) {
   try {
     const { data: stats, error } = await supabase.from('v_player_stats').select('*');
     if (error) throw error;
@@ -87,8 +109,6 @@ export async function clubAllTimeStatsView() {
     console.error('[club-all-time-stats] load failed:', err);
     slot.innerHTML = states.error();
   }
-
-  return { cleanup: null };
 }
 
 function leaderboard(stats, field, limit = 5) {

@@ -1,3 +1,4 @@
+// js/views/player-profile.js  (UPDATED: full file)
 import { supabase } from "../supabase-client.js";
 import { viewContainer } from "../view-container.js";
 import { skeletons } from "../components/skeletons.js";
@@ -5,6 +6,7 @@ import { states } from "../components/states.js";
 import { lazyImage, observeLazyImages } from "../components/lazy-image.js";
 import { shareBar, bindShareBar } from "../components/controls.js";
 import { injectStyle } from "../utils/inject-style.js";
+import { hasAccess, renderSectionGate } from "../utils/account-gate.js";
 
 injectStyle(
   "player-profile-view",
@@ -386,9 +388,9 @@ export async function playerProfileView(params) {
       return { cleanup: null };
     }
 
-    await renderProfile(root, player);
+    const stopGateWatch = await renderProfile(root, player);
 
-    return { cleanup: null };
+    return { cleanup: stopGateWatch || null };
   } catch (err) {
     console.error(
       "[player-profile] load failed:",
@@ -539,8 +541,10 @@ async function renderProfile(root, player) {
 
   bindTabs(root);
 
-  await loadStatsAndHistory(root, player.id);
+  const stopGateWatch = await loadStatsAndHistory(root, player.id);
   await loadGallery(root, player.id, displayName);
+
+  return stopGateWatch || null;
 }
 
 function bindTabs(root) {
@@ -619,6 +623,35 @@ async function loadStatsAndHistory(
   const historySlot = root.querySelector(
     '[data-slot="history"]',
   );
+
+  /* =========================================================
+     ACCOUNT GATE
+     Career stats and match history need an account. The rest of
+     the profile stays public. After login/signup these two
+     sections load in place.
+     ========================================================= */
+
+  if (!(await hasAccess())) {
+    renderSectionGate(
+      statsSlot,
+      "Log in or create an account to see career stats.",
+    );
+    renderSectionGate(
+      historySlot,
+      "Log in or create an account to see match history.",
+    );
+
+    const onAuth = async () => {
+      document.removeEventListener("auth:changed", onAuth);
+      if (!statsSlot.isConnected) return;
+      statsSlot.innerHTML = skeletons.standings(1);
+      historySlot.innerHTML = "";
+      await loadStatsAndHistory(root, playerId);
+    };
+    document.addEventListener("auth:changed", onAuth);
+
+    return () => document.removeEventListener("auth:changed", onAuth);
+  }
 
   /* =========================================================
      CAREER STATS

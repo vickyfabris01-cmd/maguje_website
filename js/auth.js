@@ -1,3 +1,4 @@
+// js/auth.js  (EDITED: full file. Changes: notifyAuthChanged, touchActivity returns a promise, login/signup await it and notify)
 import { supabase } from './supabase-client.js';
 import { dashPath } from './dashboard/config.js';
 
@@ -15,6 +16,10 @@ supabase.auth.onAuthStateChange((event) => {
     cachedAccountType = null;
   }
 });
+
+function notifyAuthChanged() {
+  document.dispatchEvent(new CustomEvent('auth:changed'));
+}
 
 export async function resolveAccountType() {
   if (cachedAccountType) return cachedAccountType;
@@ -92,7 +97,10 @@ export async function login(email, password) {
     }
   }
 
-  touchActivity();
+  // Wait for the server-side activity row so has_account() is already
+  // true when gated views re-check access.
+  await touchActivity();
+  notifyAuthChanged();
   return { error: null, accountType };
 }
 
@@ -105,7 +113,8 @@ export async function signupSupporter(email, password, fullName = '') {
   if (error) return { error };
 
   cachedAccountType = 'supporter';
-  touchActivity();
+  await touchActivity();
+  notifyAuthChanged();
   return { error: null, accountType: 'supporter' };
 }
 
@@ -148,23 +157,22 @@ export async function logout({ redirect = true } = {}) {
   }
 }
 
-export function touchActivity() {
+export async function touchActivity() {
   localStorage.setItem(IDLE_KEY, String(Date.now()));
 
-  supabase.auth.getSession().then(({ data: { session } }) => {
-    if (!session) return;
-    supabase
-      .from('user_activity')
-      .upsert({
-        id: session.user.id,
-        last_active_at: new Date().toISOString(),
-      })
-      .then(({ error }) => {
-        if (error) {
-          console.error('[session-guard] failed to write user_activity:', error);
-        }
-      });
-  });
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return;
+
+  const { error } = await supabase
+    .from('user_activity')
+    .upsert({
+      id: session.user.id,
+      last_active_at: new Date().toISOString(),
+    });
+
+  if (error) {
+    console.error('[session-guard] failed to write user_activity:', error);
+  }
 }
 
 export function getIdleLimit(accountType) {

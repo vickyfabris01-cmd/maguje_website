@@ -1,3 +1,4 @@
+// js/main.js  (UPDATED: full file; adds the account-gate import, the `gated` helper, and gates the routes below)
 import { router } from "./router.js";
 import { crestLoader } from "./components/crest-loader.js";
 import { header } from "./components/header.js";
@@ -7,6 +8,7 @@ import { officialProfileView } from "./views/official-profile.js";
 import { setRouteSEO } from "./utils/seo.js";
 
 import { withMobileGate } from "./utils/mobile-gate.js";
+import { withAccountGate } from "./utils/account-gate.js";
 
 import { initSessionGuard } from "./session-guard.js";
 
@@ -118,6 +120,15 @@ import {
   contentDashboardView as dashContentDashboardView,
 } from "./dashboard/views/content-dashboard.js";
 
+// Whole-page gated route: mobile gate outside, account gate inside.
+const gated = (view, what) =>
+  withMobileGate(
+    withAccountGate(view, {
+      title: "Account required",
+      message: `Log in or create an account to view ${what}.`,
+    }),
+  );
+
 async function boot() {
   const startingOnDashboard =
     window.location.pathname.startsWith(DASH_BASE_PATH);
@@ -159,15 +170,15 @@ async function boot() {
     .add("/", withMobileGate(homeView))
     .add("/news", withMobileGate(newsView))
     .add("/news/:slug", withMobileGate(newsDetailsView))
-    .add("/fixtures", withMobileGate(fixturesView))
-    .add("/results", withMobileGate(resultsView))
+    .add("/fixtures", gated(fixturesView, "fixtures"))
+    .add("/results", gated(resultsView, "results"))
     .add(
       "/results/head-to-head",
-      withMobileGate(headToHeadIndexView),
+      gated(headToHeadIndexView, "head-to-head records"),
     )
     .add(
       "/results/head-to-head/:teamId",
-      withMobileGate(headToHeadDetailView),
+      gated(headToHeadDetailView, "head-to-head records"),
     )
     .add("/match-reports", withMobileGate(matchReportsView))
     .add(
@@ -176,10 +187,10 @@ async function boot() {
     )
     .add(
       "/matches/:slug",
-      withMobileGate(matchDetailsView),
+      gated(matchDetailsView, "match details"),
     )
     .add("/live", withMobileGate(liveMatchView))
-    .add("/standings", withMobileGate(standingsView))
+    .add("/standings", gated(standingsView, "the standings"))
     .add("/players", withMobileGate(playersView))
     .add(
       "/players/:slug",
@@ -192,28 +203,28 @@ async function boot() {
     )
     .add(
       "/competitions",
-      withMobileGate(competitionsView),
+      gated(competitionsView, "competitions"),
     )
     .add(
       "/competitions/:slug",
-      withMobileGate(competitionDetailsView),
+      gated(competitionDetailsView, "this competition"),
     )
   
     .add(
       "/competitions/:slug/standings",
-      withMobileGate(competitionStandingsView),
+      gated(competitionStandingsView, "the standings"),
     )
     .add(
       "/competitions/:slug/fixtures",
-      withMobileGate(competitionFixturesView),
+      gated(competitionFixturesView, "fixtures"),
     )
     .add(
       "/competitions/:slug/results",
-      withMobileGate(competitionResultsView),
+      gated(competitionResultsView, "results"),
     )
     .add(
       "/competitions/:slug/player-statistics",
-      withMobileGate(competitionPlayerStatisticsView),
+      gated(competitionPlayerStatisticsView, "player statistics"),
     )
     .add(
       "/club-profile",
