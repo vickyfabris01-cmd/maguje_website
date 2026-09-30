@@ -11,13 +11,29 @@ injectStyle('report-issue-dashboard-view', `
   .report-card__desc { margin: 0.5rem 0; font-size: 0.9rem; color: #222; white-space: pre-wrap; }
   .report-card__meta { font-size: 0.78rem; color: #888; margin-bottom: 0.5rem; }
   .report-card__meta a { color: #109b45; }
-  .report-card__screenshot { max-width: 220px; border-radius: 6px; display: block; margin-bottom: 0.6rem; cursor: zoom-in; }
-  .report-card__actions { display: flex; align-items: center; gap: 0.6rem; }
+  .report-card__actions { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
   .report-card__actions select { padding: 0.4rem 0.6rem; border: 1px solid #d3ded6; border-radius: 6px; font-size: 0.82rem; }
   .status-pill { font-size: 0.75rem; padding: 0.2rem 0.6rem; border-radius: 999px; font-weight: 600; text-transform: capitalize; }
   .status-open { background: #fdeceb; color: #c43b3b; }
   .status-reviewed { background: #fff6e0; color: #b8860b; }
   .status-resolved { background: #eaf6ee; color: #109b45; }
+
+  .screenshot-lightbox {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.75);
+    display: flex; align-items: center; justify-content: center;
+    padding: 2rem; z-index: 2000;
+  }
+  .screenshot-lightbox img {
+    max-width: min(90vw, 700px); max-height: 85vh;
+    border-radius: 8px; box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  }
+  .screenshot-lightbox__close {
+    position: absolute; top: 1rem; right: 1.2rem;
+    background: rgba(255,255,255,0.15); color: #fff; border: none;
+    width: 36px; height: 36px; border-radius: 50%; font-size: 1.2rem;
+    cursor: pointer; line-height: 1;
+  }
+  .screenshot-lightbox__close:hover { background: rgba(255,255,255,0.28); }
 `);
 
 export async function reportIssueDashboardView() {
@@ -80,13 +96,13 @@ export async function reportIssueDashboardView() {
       <p class="report-card__desc">${escapeHtml(report.description)}</p>
 
       <div class="report-card__meta">
-        ${report.reporter_context ? `From: ${escapeHtml(report.reporter_context)}` : ''}
+        ${report.reporter_name ? `From: ${escapeHtml(report.reporter_name)}` : ''}
+        ${report.reporter_email ? ` · <a href="mailto:${escapeAttr(report.reporter_email)}">${escapeHtml(report.reporter_email)}</a>` : ''}
         ${report.page_url ? ` · Page: <a href="${report.page_url}" target="_blank" rel="noopener noreferrer">${escapeHtml(report.page_url)}</a>` : ''}
       </div>
 
-      ${report.screenshot_url ? `<img src="${report.screenshot_url}" alt="Screenshot" class="report-card__screenshot" data-open-image>` : ''}
-
       <div class="report-card__actions">
+        ${report.screenshot_url ? `<button class="btn-secondary" data-open-image>View Screenshot</button>` : ''}
         <select data-status-select>
           <option value="open" ${report.status === 'open' ? 'selected' : ''}>Open</option>
           <option value="reviewed" ${report.status === 'reviewed' ? 'selected' : ''}>Reviewed</option>
@@ -120,18 +136,49 @@ export async function reportIssueDashboardView() {
 
     const screenshot = card.querySelector('[data-open-image]');
     if (screenshot) {
-      screenshot.addEventListener('click', () => {
-        window.open(report.screenshot_url, '_blank', 'noopener,noreferrer');
-      });
+      screenshot.addEventListener('click', () => openScreenshotLightbox(report.screenshot_url));
     }
 
     return card;
+  }
+
+  function openScreenshotLightbox(url) {
+    const overlay = document.createElement('div');
+    overlay.className = 'screenshot-lightbox';
+    overlay.innerHTML = `
+      <button type="button" class="screenshot-lightbox__close" aria-label="Close">&times;</button>
+      <img src="${url}" alt="Reported screenshot">
+    `;
+
+    function close() {
+      overlay.remove();
+      document.removeEventListener('keydown', onKeydown);
+    }
+
+    function onKeydown(e) {
+      if (e.key === 'Escape') close();
+    }
+
+    // Click on the dark backdrop closes it; clicking the image itself
+    // (or the close button) is handled separately so the image click
+    // doesn't bubble up and immediately close its own lightbox.
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) close();
+    });
+    overlay.querySelector('.screenshot-lightbox__close').addEventListener('click', close);
+    document.addEventListener('keydown', onKeydown);
+
+    document.body.appendChild(overlay);
   }
 
   function escapeHtml(str) {
     const div = document.createElement('div');
     div.textContent = str;
     return div.innerHTML;
+  }
+
+  function escapeAttr(str) {
+    return String(str).replace(/"/g, '&quot;');
   }
 
   return { cleanup: null };

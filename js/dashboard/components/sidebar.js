@@ -51,6 +51,12 @@ const NAV_SECTIONS = {
         { href: dashPath('/supporters'), icon: ICONS.supporters, label: 'Supporters' },
       ],
     },
+    {
+      title: 'Content',
+      links: [
+        { href: dashPath('/content?tab=news'), icon: ICONS.news, label: 'News' },
+      ],
+    },
   ],
   senior_manager: [
     {
@@ -69,6 +75,12 @@ const NAV_SECTIONS = {
         { href: dashPath('/supporters'), icon: ICONS.supporters, label: 'Supporters' },
       ],
     },
+    {
+      title: 'Content',
+      links: [
+        { href: dashPath('/content?tab=news'), icon: ICONS.news, label: 'News' },
+      ],
+    },
   ],
   match_manager: [
     {
@@ -84,6 +96,12 @@ const NAV_SECTIONS = {
       title: 'Club Management',
       links: [
         { href: dashPath('/players'), icon: ICONS.player, label: 'Players' },
+      ],
+    },
+    {
+      title: 'Content',
+      links: [
+        { href: dashPath('/content?tab=news'), icon: ICONS.news, label: 'News' },
       ],
     },
   ],
