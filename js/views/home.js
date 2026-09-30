@@ -1,6 +1,9 @@
+// js/views/home.js  (UPDATED: full file)
 import { viewContainer } from "../view-container.js";
 import { skeletons } from "../components/skeletons.js";
 import { injectStyle } from "../utils/inject-style.js";
+import { hasAccess } from "../utils/account-gate.js";
+import { fetchMatchTeasers, matchTeasersHtml } from "../components/match-teaser.js";
 
 import {
   fetchFixturesData,
@@ -58,6 +61,37 @@ injectStyle(
 );
 
 export async function homeView() {
+  let hasAccount = await hasAccess();
+  let current = await mountHome(hasAccount);
+  let disposed = false;
+
+  // Logging in swaps the gated sections in without a reload. Only
+  // remounts when the access state actually changed.
+  const onAuth = async () => {
+    if (disposed) return;
+    const next = await hasAccess();
+    if (disposed || next === hasAccount) return;
+    hasAccount = next;
+    current.cleanup();
+    current = await mountHome(hasAccount);
+  };
+  document.addEventListener("auth:changed", onAuth);
+
+  return {
+    cleanup() {
+      disposed = true;
+      document.removeEventListener("auth:changed", onAuth);
+      current.cleanup();
+    },
+  };
+}
+
+// Match data (live match, upcoming fixtures, player spotlight, and the
+// live/upcoming hero slides) is only fetched and rendered when the
+// visitor has an account. Anonymous visitors get no fixtures or
+// spotlight; in their place they see a slim teaser (live now and/or
+// the next kickoff time) that links to the gated pages.
+async function mountHome(hasAccount) {
   const cleanupFns = [];
 
   // Shared registry of advance() fns for the global auto-scroll.
@@ -67,17 +101,12 @@ export async function homeView() {
   // contents of the same array reference at each tick).
   const autoScrollRegistry = [];
 
-  await viewContainer.render(`
-    <div class="container home-page">
-      <div class="home-feed">
+  const fixturesSlot = hasAccount
+    ? `<div class="home-fixtures-section" data-slot="fixtures-section">${skeletons.kickoffPill()}${skeletons.fixtureCard()}</div>`
+    : "";
 
-        <div data-slot="hero-wrap">${skeletons.heroCarousel()}</div>
-
-        <div class="home-events-section" data-slot="events-section">${skeletons.eventCard()}</div>
-
-        <div class="home-fixtures-section" data-slot="fixtures-section">${skeletons.kickoffPill()}${skeletons.fixtureCard()}</div>
-
-        <section class="home-section" data-slot="spotlight-section">
+  const spotlightSlot = hasAccount
+    ? `<section class="home-section" data-slot="spotlight-section">
           <div class="home-section__header">
             <h2 class="home-section__title">Player Spotlight</h2>
           </div>
@@ -86,7 +115,28 @@ export async function homeView() {
               <div class="carousel__track" data-track>${skeletons.spotlightRow(1)}</div>
             </div>
           </div>
-        </section>
+        </section>`
+    : "";
+
+  // Anonymous only: hidden until we know there is something to tease,
+  // so it adds no gap or skeleton when nothing is on.
+  const matchTeaserSlot = hasAccount
+    ? ""
+    : `<div data-slot="match-teaser-section" hidden></div>`;
+
+  await viewContainer.render(`
+    <div class="container home-page">
+      <div class="home-feed">
+
+        <div data-slot="hero-wrap">${skeletons.heroCarousel()}</div>
+
+        <div class="home-events-section" data-slot="events-section">${skeletons.eventCard()}</div>
+
+        ${matchTeaserSlot}
+
+        ${fixturesSlot}
+
+        ${spotlightSlot}
 
         <section class="home-section" data-slot="news-section">
           <div class="home-section__header">
@@ -120,11 +170,12 @@ export async function homeView() {
 
   // Hero, Events, Fixtures, and Spotlight all depend on data fetched
   // once here — no section duplicates a query another section needs.
-  const [fixtures, spotlightItems, heroImageUrl, events] = await Promise.all([
-    fetchFixturesData(),
-    fetchSpotlightData(),
+  const [fixtures, spotlightItems, heroImageUrl, events, teasers] = await Promise.all([
+    hasAccount ? fetchFixturesData() : { liveMatch: null, upcomingMatches: [] },
+    hasAccount ? fetchSpotlightData() : [],
     fetchLatestGalleryImageUrl(),
     fetchEventsData(),
+    hasAccount ? null : fetchMatchTeasers().catch(() => null),
   ]);
 
   // Rendered in page order: Hero → Events → Fixtures → Spotlight.
@@ -135,8 +186,20 @@ export async function homeView() {
   renderHeroSection(root, { ...fixtures, heroImageUrl }, cleanupFns);
 
   registerSection(renderEventsSection(root, events), cleanupFns, autoScrollRegistry);
-  registerSection(renderFixturesSection(root, fixtures), cleanupFns, autoScrollRegistry);
-  registerSection(renderSpotlightSection(root, spotlightItems), cleanupFns, autoScrollRegistry);
+
+  if (!hasAccount && teasers) {
+    const teaserHtml = matchTeasersHtml(teasers);
+    const teaserSlot = root.querySelector('[data-slot="match-teaser-section"]');
+    if (teaserHtml && teaserSlot) {
+      teaserSlot.innerHTML = teaserHtml;
+      teaserSlot.hidden = false;
+    }
+  }
+
+  if (hasAccount) {
+    registerSection(renderFixturesSection(root, fixtures), cleanupFns, autoScrollRegistry);
+    registerSection(renderSpotlightSection(root, spotlightItems), cleanupFns, autoScrollRegistry);
+  }
 
   // News and Match Reports fetch independently and aren't awaited
   // here — they populate their own skeletons once ready, same as

@@ -84,6 +84,39 @@
   <script src="/js/dashboard/scoreboard-core.js"></script>
   <script src="/js/dashboard/fab-scoreboard.js"></script>
   <script type="module" src="/js/main.js"></script>
+  <!-- TEMP DEBUG: delete this whole block once the blank page is fixed -->
+<script>
+(function () {
+  var box;
+  function show(msg) {
+    if (!box) {
+      box = document.createElement('pre');
+      box.style.cssText = 'position:fixed;left:0;right:0;bottom:0;max-height:60vh;overflow:auto;margin:0;padding:8px;background:#200;color:#fbb;font:11px/1.4 monospace;white-space:pre-wrap;z-index:2147483647';
+      (document.body || document.documentElement).appendChild(box);
+    }
+    box.textContent += msg + '\n\n';
+  }
+  window.addEventListener('error', function (e) {
+    var t = e.target;
+    if (t && t !== window && (t.src || t.href)) {
+      show('LOAD FAILED: ' + (t.src || t.href));
+    } else {
+      show('ERROR: ' + e.message + '\n' + (e.filename || '') + ':' + (e.lineno || '') + ':' + (e.colno || ''));
+    }
+  }, true);
+  window.addEventListener('unhandledrejection', function (e) {
+    show('REJECTION: ' + ((e.reason && (e.reason.stack || e.reason.message)) || e.reason));
+  });
+  var ce = console.error;
+  console.error = function () {
+    show('console.error: ' + Array.prototype.map.call(arguments, function (a) {
+      return (a && a.stack) || String(a);
+    }).join(' '));
+    ce.apply(console, arguments);
+  };
+})();
+</script>
+<!-- END TEMP DEBUG -->
 </body>
 
 

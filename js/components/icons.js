@@ -1,4 +1,4 @@
-// js/components/icons.js  (NEW)
+// js/components/icons.js  (UPDATED: full file)
 import { injectStyle } from '../utils/inject-style.js';
 
 injectStyle('icons', `
@@ -10,6 +10,7 @@ injectStyle('icons', `
     50% { transform: scale(0.7); opacity: 0.6; }
   }
   @media (prefers-reduced-motion: reduce) { .icon-live__dot { animation: none; } }
+  .icon-clock { color: var(--color-ridge-green); vertical-align: middle; }
 `);
 
 export function liveIcon({ size = 16, label = 'Live' } = {}) {
@@ -22,3 +23,15 @@ export function liveIcon({ size = 16, label = 'Live' } = {}) {
   </svg>`;
 }
 
+export function clockIcon({ size = 16, label = 'Upcoming' } = {}) {
+  return `<svg class="icon-clock" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="${label}">
+    <circle cx="12" cy="12" r="9"/>
+    <path d="M12 7v5l3 2"/>
+  </svg>`;
+}
+
+export function chevronIcon({ size = 16 } = {}) {
+  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M9 6l6 6-6 6"/>
+  </svg>`;
+}
