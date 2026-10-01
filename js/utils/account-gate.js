@@ -1,7 +1,7 @@
-// js/utils/account-gate.js  (UPDATED: full file; adds `renderLocked` option and only listens for login while locked)
+// js/utils/account-gate.js  (UPDATED: full file; adds the one-time activity refresh in hasAccess)
 import { supabase } from '../supabase-client.js';
 import { viewContainer } from '../view-container.js';
-import { resolveAccountType } from '../auth.js';
+import { resolveAccountType, touchActivity } from '../auth.js';
 import { injectStyle } from './inject-style.js';
 import { openAuthModal } from '../components/auth-modal.js';
 import {
@@ -54,7 +54,16 @@ export async function hasAccess() {
     return accessCache.value;
   }
 
-  const { data, error } = await supabase.rpc('has_account');
+  let { data, error } = await supabase.rpc('has_account');
+
+  // A live session can be ahead of its activity row (first load after
+  // the guard starts, or an older account with no row yet). Refresh the
+  // row once and ask again before treating the visitor as locked out.
+  if (!error && data !== true) {
+    await touchActivity();
+    ({ data, error } = await supabase.rpc('has_account'));
+  }
+
   const value = error ? !!(await resolveAccountType()) : data === true;
   accessCache = { value, at: Date.now() };
   return value;
